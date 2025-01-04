@@ -53,10 +53,16 @@ read -p "Enter the validator name: " VALIDATOR_NAME
 read -p "Enter your private key: " PRIVATE_KEY
 read -p "Enter your RPC URL: " RPC_URL
 
-# Step 6: Create and run the Hyperlane container
-VALIDATOR_DIR="/opt/hyperlane_db_$VALIDATOR_NAME"
-mkdir -p "$VALIDATOR_DIR"
+# Step 6: Create and set permissions for the validator directory
+VALIDATOR_DIR="/opt/hyperlane_db_base/$VALIDATOR_NAME"
 
+# Create the directory for the validator
+sudo mkdir -p "$VALIDATOR_DIR"
+
+# Set read/write/execute permissions for all users
+sudo chmod -R 777 "$VALIDATOR_DIR"
+
+# Step 7: Create and run the Hyperlane container
 echo "Starting Hyperlane container..."
 docker run -d \
     --name "$CONTAINER_NAME" \
