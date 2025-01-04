@@ -1,91 +1,77 @@
 #!/bin/bash
 
-# Kiểm tra & cài đặt Docker
-echo "=== Kiểm tra Docker ==="
-if ! [ -x "$(command -v docker)" ]; then
-    echo "Docker không được cài đặt. Bắt đầu cài đặt Docker..."
+echo "Starting Hyperlane Setup..."
+
+# Function to check if a command exists
+command_exists() {
+    command -v "$1" &> /dev/null
+}
+
+# Step 1: Check and install Docker
+if command_exists docker; then
+    echo "Docker is already installed."
+else
+    echo "Installing Docker..."
     sudo apt-get update
     sudo apt-get install -y docker.io
     sudo systemctl start docker
     sudo systemctl enable docker
-    echo "Docker đã được cài đặt thành công."
-else
-    echo "Docker đã được cài đặt. Bỏ qua."
 fi
 
-# Kiểm tra & cài đặt NVM và Node.js
-echo "=== Kiểm tra NVM và Node.js ==="
-if ! [ -x "$(command -v nvm)" ]; then
-    echo "NVM không được cài đặt. Bắt đầu cài đặt NVM..."
+# Step 2: Check and install NVM and Node.js
+if command_exists node && command_exists nvm; then
+    echo "Node.js and NVM are already installed."
+else
+    echo "Installing NVM and Node.js..."
     curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.0/install.sh | bash
     export NVM_DIR="$HOME/.nvm"
     [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
     [ -s "$NVM_DIR/bash_completion" ] && . "$NVM_DIR/bash_completion"
-else
-    echo "NVM đã được cài đặt. Bỏ qua."
-fi
-
-if ! [ -x "$(command -v node)" ]; then
-    echo "Node.js không được cài đặt. Bắt đầu cài đặt Node.js..."
     nvm install 20
-else
-    echo "Node.js đã được cài đặt. Bỏ qua."
 fi
 
-# Cài đặt Hyperlane CLI
-echo "=== Kiểm tra Hyperlane CLI ==="
-if ! [ -x "$(command -v hyperlane)" ]; then
-    echo "Hyperlane CLI không được cài đặt. Bắt đầu cài đặt..."
+# Step 3: Install Hyperlane CLI
+if command_exists hyperlane; then
+    echo "Hyperlane CLI is already installed."
+else
+    echo "Installing Hyperlane CLI..."
     npm install -g @hyperlane-xyz/cli
-else
-    echo "Hyperlane CLI đã được cài đặt. Bỏ qua."
 fi
 
-# Kéo hình ảnh Docker Hyperlane
-echo "=== Kiểm tra hình ảnh Docker Hyperlane ==="
-if ! docker images | grep -q "gcr.io/abacus-labs-dev/hyperlane-agent"; then
-    echo "Hình ảnh Docker Hyperlane chưa tồn tại. Bắt đầu tải về..."
-    docker pull --platform linux/amd64 gcr.io/abacus-labs-dev/hyperlane-agent:agents-v1.0.0
+# Step 4: Pull Hyperlane Docker image
+IMAGE_NAME="gcr.io/abacus-labs-dev/hyperlane-agent:agents-v1.0.0"
+if docker image inspect "$IMAGE_NAME" > /dev/null 2>&1; then
+    echo "Hyperlane Docker image is already pulled."
 else
-    echo "Hình ảnh Docker Hyperlane đã tồn tại. Bỏ qua."
+    echo "Pulling Hyperlane Docker image..."
+    docker pull --platform linux/amd64 "$IMAGE_NAME"
 fi
 
-# Yêu cầu thông tin từ người dùng
-echo "=== Nhập thông tin cấu hình ==="
-read -p "Nhập tên container: " container_name
-read -p "Nhập tên validator: " validator_name
-read -p "Nhập Private Key (dạng 0x...): " private_key
-read -p "Nhập URL RPC (vd: https://base-mainnet.g.alchemy.com/v2/YOUR_KEY): " rpc_url
+# Step 5: Gather user inputs
+read -p "Enter the container name: " CONTAINER_NAME
+read -p "Enter the validator name: " VALIDATOR_NAME
+read -p "Enter your private key: " PRIVATE_KEY
+read -p "Enter your RPC URL: " RPC_URL
 
-# Tạo thư mục lưu trữ dữ liệu
-data_dir="/opt/hyperlane_db_base/$validator_name"
-echo "Tạo thư mục lưu trữ dữ liệu tại $data_dir..."
-sudo mkdir -p "$data_dir"
-sudo chmod -R 777 "$data_dir"
+# Step 6: Create and run the Hyperlane container
+VALIDATOR_DIR="/opt/hyperlane_db_$VALIDATOR_NAME"
+mkdir -p "$VALIDATOR_DIR"
 
-# Chạy container Hyperlane
-echo "=== Chạy container Hyperlane ==="
+echo "Starting Hyperlane container..."
 docker run -d \
-    --name "$container_name" \
-    --mount type=bind,source="$data_dir",target=/hyperlane_db_base \
-    gcr.io/abacus-labs-dev/hyperlane-agent:agents-v1.0.0 \
+    --name "$CONTAINER_NAME" \
+    --mount type=bind,source="$VALIDATOR_DIR",target=/hyperlane_db_base \
+    "$IMAGE_NAME" \
     ./validator \
     --db /hyperlane_db_base \
     --originChainName base \
     --reorgPeriod 1 \
-    --validator.id "$validator_name" \
+    --validator.id "$VALIDATOR_NAME" \
     --checkpointSyncer.type localStorage \
     --checkpointSyncer.folder base \
     --checkpointSyncer.path /hyperlane_db_base/base_checkpoints \
-    --validator.key "$private_key" \
-    --chains.base.signer.key "$private_key" \
-    --chains.base.customRpcUrls "$rpc_url"
+    --validator.key "$PRIVATE_KEY" \
+    --chains.base.signer.key "$PRIVATE_KEY" \
+    --chains.base.customRpcUrls "$RPC_URL"
 
-# Xác nhận kết quả
-if [ $? -eq 0 ]; then
-    echo "Container Hyperlane đã được khởi chạy thành công!"
-    echo "Tên container: $container_name"
-    echo "Thư mục dữ liệu: $data_dir"
-else
-    echo "Có lỗi xảy ra khi khởi chạy container Hyperlane."
-fi
+echo "Hyperlane container '$CONTAINER_NAME' is now running."
