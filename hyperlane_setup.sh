@@ -1,6 +1,13 @@
 #!/bin/bash
 
-echo "Starting Hyperlane Setup..."
+# Define color codes
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No color
+
+echo -e "${BLUE}Starting Hyperlane Setup...${NC}"
 
 # Function to check if a command exists
 command_exists() {
@@ -9,9 +16,9 @@ command_exists() {
 
 # Step 1: Check and install Docker
 if command_exists docker; then
-    echo "Docker is already installed."
+    echo -e "${GREEN}Docker is already installed.${NC}"
 else
-    echo "Installing Docker..."
+    echo -e "${YELLOW}Installing Docker...${NC}"
     sudo apt-get update
     sudo apt-get install -y docker.io
     sudo systemctl start docker
@@ -20,9 +27,9 @@ fi
 
 # Step 2: Check and install NVM and Node.js
 if command_exists node && command_exists nvm; then
-    echo "Node.js and NVM are already installed."
+    echo -e "${GREEN}Node.js and NVM are already installed.${NC}"
 else
-    echo "Installing NVM and Node.js..."
+    echo -e "${YELLOW}Installing NVM and Node.js...${NC}"
     curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.0/install.sh | bash
     export NVM_DIR="$HOME/.nvm"
     [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
@@ -32,18 +39,18 @@ fi
 
 # Step 3: Install Hyperlane CLI
 if command_exists hyperlane; then
-    echo "Hyperlane CLI is already installed."
+    echo -e "${GREEN}Hyperlane CLI is already installed.${NC}"
 else
-    echo "Installing Hyperlane CLI..."
+    echo -e "${YELLOW}Installing Hyperlane CLI...${NC}"
     npm install -g @hyperlane-xyz/cli
 fi
 
 # Step 4: Pull Hyperlane Docker image
 IMAGE_NAME="gcr.io/abacus-labs-dev/hyperlane-agent:agents-v1.0.0"
 if docker image inspect "$IMAGE_NAME" > /dev/null 2>&1; then
-    echo "Hyperlane Docker image is already pulled."
+    echo -e "${GREEN}Hyperlane Docker image is already pulled.${NC}"
 else
-    echo "Pulling Hyperlane Docker image..."
+    echo -e "${YELLOW}Pulling Hyperlane Docker image...${NC}"
     docker pull --platform linux/amd64 "$IMAGE_NAME"
 fi
 
@@ -57,13 +64,15 @@ read -p "Enter your RPC URL: " RPC_URL
 VALIDATOR_DIR="/opt/hyperlane_db_base/$VALIDATOR_NAME"
 
 # Create the directory for the validator
+echo -e "${YELLOW}Creating directory for validator...${NC}"
 sudo mkdir -p "$VALIDATOR_DIR"
 
 # Set read/write/execute permissions for all users
+echo -e "${YELLOW}Setting permissions for the validator directory...${NC}"
 sudo chmod -R 777 "$VALIDATOR_DIR"
 
 # Step 7: Create and run the Hyperlane container
-echo "Starting Hyperlane container..."
+echo -e "${BLUE}Starting Hyperlane container...${NC}"
 docker run -d \
     --name "$CONTAINER_NAME" \
     --mount type=bind,source="$VALIDATOR_DIR",target=/hyperlane_db_base \
@@ -80,4 +89,4 @@ docker run -d \
     --chains.base.signer.key "$PRIVATE_KEY" \
     --chains.base.customRpcUrls "$RPC_URL"
 
-echo "Hyperlane container '$CONTAINER_NAME' is now running."
+echo -e "${GREEN}Hyperlane container '$CONTAINER_NAME' is now running.${NC}"
